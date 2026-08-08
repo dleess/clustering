@@ -66,7 +66,26 @@ If the individual-fit values of the primary global parameter form value groups
 ## Execution — orchestrator + parallel computation agents
 
 The procedure needs several fit runs (Step 3 exclusion refits, Step 4 group
-fits). Never run them serially yourself — act as the **orchestrator**:
+fits). Never run them serially yourself.
+
+**Codex model contract:** orchestration runs on `gpt-5.6-sol`. If the active
+agent is not already that model, create exactly one orchestration agent with
+`model: "gpt-5.6-sol"` and `fork_turns: "none"`, passing the complete task and
+skill context; that agent owns the workflow below and must not create another
+orchestrator. Every parallel computation agent must be created with
+`model: "gpt-5.6-luna"` and `fork_turns: "none"`, with its full assigned-config
+contract in the prompt.
+
+**Claude model contract:** orchestration runs on `fable`. If the active agent is
+not already that model, create exactly one orchestration agent (Agent tool) with
+`model: "fable"`, passing the complete task and skill context; that agent owns
+the workflow below and must not create another orchestrator. Every parallel
+computation agent must be created with `model: "haiku"`, with its full
+assigned-config contract in the prompt.
+
+On other runtimes, use the available agent mechanism.
+
+The orchestrator then:
 
 1. Run the initial full global fit (this one is sequential — everything depends
    on it) and form your hypotheses from its output.
