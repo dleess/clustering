@@ -1,6 +1,6 @@
 # HANDOFF: `clustering` skill — residue-cluster counting for global fits (built & validated)
 
-**Written:** 2026-08-07 · **Working dir:** `/Users/donghanlee/work/projects/clustering` (renamed from `.../globalfit` on 2026-08-07; directory itself is empty) · **Branch:** `codex/codex-beginner-manual` (git repo is rooted at `$HOME`, not in this folder)
+**Written:** 2026-08-07 · **Working dir:** `/Users/donghanlee/work/projects/clustering` (renamed from `.../globalfit` on 2026-08-07) · git repo root moved from `$HOME` into this folder on 2026-08-08; the skill now lives here as a plugin (`skills/clustering/SKILL.md`)
 
 ## Goal
 A Claude Code skill that, given a program fitting multi-residue data with shared

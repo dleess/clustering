@@ -7,11 +7,8 @@ per-cluster global parameter values.
 
 ## Install
 
-From a local clone (the plugin lives at `work/projects/clustering` inside the
-repo, which is rooted at `$HOME`):
-
 ```bash
-claude plugin marketplace add /path/to/work/projects/clustering
+claude plugin marketplace add /path/to/clustering   # local clone (repo root = plugin root)
 claude plugin install clustering@clustering
 ```
 
