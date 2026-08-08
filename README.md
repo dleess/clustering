@@ -1,11 +1,22 @@
-# clustering — Claude Code plugin
+# clustering — Claude Code and Codex CLI plugin
 
-Claude Code plugin that decides how many clusters **K** of residues share
+Plugin that decides how many clusters **K** of residues share
 global parameters in a multi-residue global fit (e.g. relaxation-dispersion
 data fitted with shared kex, pB). Output: K, cluster membership, and
 per-cluster global parameter values.
 
 ## Install
+
+### Codex CLI
+
+```bash
+codex plugin marketplace add /path/to/clustering
+codex plugin add clustering@clustering
+```
+
+Start a new Codex thread after installation so the `clustering` skill is loaded.
+
+### Claude Code
 
 ```bash
 claude plugin marketplace add /path/to/clustering   # local clone (repo root = plugin root)
@@ -41,5 +52,7 @@ memberships exact (e.g. c2 kex 607/1807 vs truth 600/1800).
 ## Layout
 
 - `skills/clustering/SKILL.md` — the skill
+- `.codex-plugin/plugin.json` — Codex CLI plugin manifest
+- `.agents/plugins/marketplace.json` — Codex CLI marketplace
 - `.claude-plugin/plugin.json` — plugin manifest
 - `.claude-plugin/marketplace.json` — lets this repo serve as its own marketplace

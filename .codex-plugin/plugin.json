@@ -1,0 +1,27 @@
+{
+  "name": "clustering",
+  "version": "0.1.0",
+  "description": "Decide how many clusters K of residues share global parameters in multi-residue global fits.",
+  "author": {
+    "name": "Donghan Lee",
+    "url": "https://github.com/dleess"
+  },
+  "homepage": "https://github.com/dleess/clustering",
+  "repository": "https://github.com/dleess/clustering",
+  "keywords": ["clustering", "global-fit", "residues", "aicc", "jackknife"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Clustering",
+    "shortDescription": "Count residue clusters in global fits",
+    "longDescription": "Choose K, memberships, and shared parameter values for multi-residue global fits using reduced chi-squared, AICc, jackknife stability, and outlier diagnostics.",
+    "developerName": "Donghan Lee",
+    "category": "Productivity",
+    "capabilities": ["Instructions"],
+    "websiteURL": "https://github.com/dleess/clustering",
+    "defaultPrompt": [
+      "Decide how many residue clusters this global fit contains.",
+      "Compare global, clustered, and individual fit hypotheses.",
+      "Find outlier residues that destabilize this global fit."
+    ]
+  }
+}
