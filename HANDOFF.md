@@ -1,6 +1,6 @@
 # HANDOFF: `clustering` skill — residue-cluster counting for global fits (built & validated)
 
-**Written:** 2026-08-07 · **Working dir:** `/Users/donghanlee/work/projects/clustering` (renamed from `.../globalfit` on 2026-08-07) · git repo root moved from `$HOME` into this folder on 2026-08-08; the skill now lives here as a plugin (`skills/clustering/SKILL.md`)
+**Written:** 2026-08-07 · **Updated:** 2026-08-08 (model contracts + dual-runtime verification) · **Working dir:** `/Users/donghanlee/work/projects/clustering` (renamed from `.../globalfit` on 2026-08-07) · git repo root moved from `$HOME` into this folder on 2026-08-08; the skill now lives here as a plugin (`skills/clustering/SKILL.md`)
 
 ## Goal
 A Claude Code skill that, given a program fitting multi-residue data with shared
@@ -12,6 +12,26 @@ the right K each time. **This was met 4/4 — goal complete, no work is pending.
 ## Status
 100% done. Skill deployed and validated. This handoff exists only so a fresh
 agent can pick up follow-on work (new scenarios, skill refinements).
+
+2026-08-08 addendum — per-runtime model contracts (PR #6, merged):
+- SKILL.md Execution section now pins models per runtime: **Codex** orchestration
+  on `gpt-5.6-sol`, parallel computation agents on `gpt-5.6-luna` (both
+  `fork_turns: "none"`); **Claude** orchestration on `fable`, computation agents
+  on `haiku`. Other runtimes fall back to whatever agent mechanism exists.
+- Both contracts verified with REAL end-to-end clustering runs on regenerated
+  sherekhan demo scenarios (`demo/multi/make_multi.py`, seed 2025):
+  - Claude (this session): g3 → K=3 exact, memberships {R1,R2|R3,R4|R5,R6},
+    kex 410.8/1022.0/2529.0 vs truth 400/1000/2500. Orchestrator = active fable
+    agent (no extra orchestrator spawned, per contract), 4 computation agents
+    spawned with `model: "haiku"` in one message.
+  - Codex (`codex exec`): g2 → K=2 exact, R1–R3|R4–R6, kex 600.7/1825.0 vs
+    truth 600/1800. Session rollouts (`~/.codex/sessions/2026/08/08/`) show the
+    orchestration agent on `gpt-5.6-sol` and 4 computation agents on
+    `gpt-5.6-luna`, spawns with `fork_turns: "none"`.
+- Plugin installed locally on both runtimes from this repo directory:
+  Claude `claude plugin install clustering@clustering` (marketplace source =
+  this dir), Codex `codex plugin marketplace add <this dir>` +
+  `codex plugin add clustering@clustering`.
 
 ## What worked
 - Skill file: `/Users/donghanlee/.claude/skills/clustering/SKILL.md` (frontmatter `name: clustering`; dir was `counting-residue-clusters` before rename on 2026-08-07). **[still applied]**
@@ -27,15 +47,14 @@ agent can pick up follow-on work (new scenarios, skill refinements).
 ## What didn't work
 - `python`/`python3` at `/opt/homebrew/bin/python3` (3.14.6) has no numpy → sherekhan scripts fail with `ModuleNotFoundError: No module named 'numpy'`. Fixed by venv (below), don't retry bare python3. **[venv still exists]**
 - During an earlier mock test, the orchestrating test agent ended its turn while its background computation agents were still running; had to be resumed via SendMessage. Mitigation used in all later tests: instruct test agents to dispatch computation agents with `run_in_background: false`, all calls in one message. This instruction lives in the test prompts, not in the skill.
+- `codex exec "<prompt>"` run as a detached background command hangs forever at "Reading additional input from stdin..." — it waits for stdin EOF. Fix: append `< /dev/null`. **[gotcha, will recur]**
+- venv needs `matplotlib` too, not just numpy/scipy — `cpmg/model_2state.py` imports it at module level.
+- A skill loaded via the Skill tool mid-session can serve a stale cached version (session-start snapshot), even after the file on disk changed. Content on disk was correct; restart the session (or read the file directly) when verifying skill edits.
 
 ## Key files & commands
 - `/Users/donghanlee/.claude/skills/clustering/SKILL.md` — the skill. Registered as `/clustering`.
 - `/Users/donghanlee/work/projects/sherekhan/` — fit program repo. `sk_run.py` is the fitter; `demo/multi/make_multi.py` is the generator template mine was adapted from; `MANUAL.en.md` documents the statistics.
-- Scratchpad (session-scoped, `/private/tmp/claude-501/-Users-donghanlee-work-projects-globalfit/f0318c54-b928-4219-a2f1-3eac23e83f01/scratchpad/`, may be gone in a new session):
-  - `venv/` — python venv with numpy/scipy/matplotlib.
-  - `make_goal_scenarios.py` — regenerates c1–c4 into `goalcheck/<name>/` and truth into `answers/<name>.json` (kept separate so test agents can't peek).
-  - `goalcheck/c{1..4}/` — data (`f60.dat`, `f90.dat`), `run.conf`, group configs, logs.
-  - `mockfit/` — bash mock `sk-run` used for the earlier orchestration GREEN test.
+- Scratchpad from the 2026-08-07 session is GONE (its `make_goal_scenarios.py` and `goalcheck/c{1..4}` with it). Equivalent scenarios come straight from the repo generator: `<venv>/bin/python /Users/donghanlee/work/projects/sherekhan/demo/multi/make_multi.py` writes m1–m4/g2/g3 (data + conf + truth.json) into `demo/multi/<name>/`; move `truth.json` aside before handing a dir to a test agent.
 - Run a fit: `cd <scenario dir> && <venv>/bin/python3 /Users/donghanlee/work/projects/sherekhan/sk_run.py run.conf` — prints human tables plus strict-JSON blocks `##### model_comparison` and `##### jackknife`; residue toggling via `"residues": [{"name":"R1","flag":"on"|"off"}]` in the JSON conf. c1 run takes <1 s.
 
 ## Next steps
