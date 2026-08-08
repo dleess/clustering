@@ -10,7 +10,7 @@ per-cluster global parameter values.
 ### Codex CLI
 
 ```bash
-codex plugin marketplace add /path/to/clustering
+codex plugin marketplace add dleess/clustering
 codex plugin add clustering@clustering
 ```
 
@@ -19,7 +19,7 @@ Start a new Codex thread after installation so the `clustering` skill is loaded.
 ### Claude Code
 
 ```bash
-claude plugin marketplace add /path/to/clustering   # local clone (repo root = plugin root)
+claude plugin marketplace add dleess/clustering
 claude plugin install clustering@clustering
 ```
 
