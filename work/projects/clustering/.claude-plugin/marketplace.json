@@ -1,0 +1,14 @@
+{
+  "name": "clustering",
+  "owner": {
+    "name": "Donghan Lee"
+  },
+  "description": "Residue-cluster counting skill for multi-residue global fits.",
+  "plugins": [
+    {
+      "name": "clustering",
+      "source": "./",
+      "description": "Residue-cluster counting for global fits: K, membership, per-cluster global parameter values."
+    }
+  ]
+}

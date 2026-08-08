@@ -1,6 +1,6 @@
 ---
 name: clustering
-description: Use when multi-residue (or multi-dataset) fitting output must be judged for how many clusters share global parameters — e.g. global-vs-individual model comparison tables (chi2, AICc, dAICc, z), jackknife validation, relaxation-dispersion sk-run logs — to decide between 1-global, K-global, and individual models.
+description: Use when the user mentions cluster/clustering, 클러스터, 크러스트, group/grouping, 그룹핑, 그룹 of fitted residues or datasets, or when multi-residue fitting output must be judged for how many clusters share global parameters — e.g. global-vs-individual model comparison tables (chi2, AICc, dAICc, z), jackknife validation, relaxation-dispersion sk-run logs — to decide between 1-global, K-global, and individual models.
 ---
 
 # Counting Residue Clusters in Global Fits
@@ -18,10 +18,15 @@ Binary flags hide the cause; magnitudes (reduced chi², chi2_glob ranking) survi
 
 ## Setup — establish before running anything
 
-1. Fit command (e.g. `sk-run run.conf`) and how to toggle residues on/off in config.
-2. Names of the global parameter(s); the **primary** one (first listed, e.g. kex)
-   is used for z-scores and clustering.
-3. Where to read: global chi², parameter count k, total data points n, per-residue
+When this skill is invoked, FIRST ask the user (one question round, skip any
+item the user already stated):
+
+1. **Which fit program?** Exact command (e.g. `sk-run run.conf`), config/data
+   location, and how to toggle residues on/off in the config.
+2. **Which parameters are global?** Names of the shared parameter(s); the
+   **primary** one (first listed, e.g. kex) is used for z-scores and clustering.
+
+Then locate in the program's output: global chi², parameter count k, total data points n, per-residue
    `chi2_glob`/`chi2_indiv`/`dAICc`/`z`, jackknife block, per-residue individual
    fit values of the global parameters.
 
