@@ -1,0 +1,46 @@
+{
+  "_usage": "jev_ask(state=<output of scripts/jev_state.py>, questions=<this file's 'questions'>). Questions are independent; put every rule in the question text, jev sees nothing else.",
+  "_rules": "Relaxation-dispersion global fitting; residues share global parameters kex and pB. Decision rules: (1) if the 1-global fit has red_chi2 = chi2/(n-k) <= 1, K=1 and any split is overfitting. (2) If red_chi2 > 1 but preferred=global with jackknife rel SE of a few percent and no influential flags, K=1 still holds; a single residue flagged better=individual with |dAICc| < 2 is noise. (3) Otherwise rank residues by chi2_glob descending; a residue is an individual only if excluding it restores the remaining fit to preferred=global with small jackknife SE. (4) Otherwise compare total AICc of 1-global vs K-global computed on the SAME total n; a K-global hypothesis counts only if every group has preferred=global and small jackknife SE. Never split a group further once its own red_chi2 <= 1, even if AICc drops slightly.",
+  "questions": [
+    {
+      "id": "evidence",
+      "type": "score",
+      "question": "<_rules> Rate the strength of evidence FOR the proposed split (K>1 or individuals) over a single global cluster.",
+      "levels": [
+        "none: rule 1 or rule 2 resolves K=1; no split is warranted",
+        "weak: 1-global fails rules 1-2, but the proposed split lowers total AICc by less than 2 units, or at least one proposed group fails internally (preferred=individual, or jackknife rel SE above ~10%)",
+        "moderate: proposed split lowers total AICc by 2 to 10 units and every group has preferred=global with jackknife rel SE below ~5%",
+        "strong: proposed split lowers total AICc by more than 10 units, every group has preferred=global, red_chi2 roughly 0.7-1.5, jackknife rel SE below ~5%, and individual kex values separate into groups by gaps far larger than within-group spread"
+      ]
+    },
+    {
+      "id": "structure",
+      "type": "classify",
+      "add_none": false,
+      "question": "<_rules> Which cluster structure do the rules select for this data?",
+      "options": {
+        "K1": "one shared cluster, all residues",
+        "K1_plus_individuals": "one shared cluster plus one or more residues fitted individually",
+        "K2": "two shared clusters, no individuals",
+        "K2_plus_individuals": "two shared clusters plus individual residues",
+        "K3": "three shared clusters, no individuals",
+        "K3_plus_individuals": "three shared clusters plus individual residues",
+        "K4_or_more": "four or more shared clusters"
+      }
+    },
+    {
+      "id": "split_further",
+      "type": "check",
+      "question": "<_rules> Would splitting any group of the selected hypothesis further (into smaller groups or individuals) be justified?",
+      "yes_means": "some group still fails internally, so it must be split further",
+      "no_means": "every group passes internally (or has red_chi2 <= 1); further splitting is overfitting"
+    },
+    {
+      "id": "more_fits_needed",
+      "type": "check",
+      "question": "<_rules> Does deciding K for this data require any additional fits beyond those shown?",
+      "yes_means": "more fits are needed",
+      "no_means": "the shown fits already decide K; further fits are wasted"
+    }
+  ]
+}
