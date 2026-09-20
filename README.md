@@ -40,6 +40,13 @@ procedure:
    values of the primary global parameter, per-group fits, total-AICc
    structure selection with **n = total data points in every hypothesis**.
 
+5. **jev cross-check** (optional, when the `jev` MCP server is configured) —
+   `scripts/jev_state.py` turns the fit logs into a compact state and
+   `references/jev-questions.json` holds a fixed question set (evidence
+   strength, selected structure, split-further, more-fits-needed). jev is a
+   gate on the orchestrator's conclusion, never an override of the red χ²
+   gate or a failed group refit.
+
 Fit runs are dispatched as parallel computation agents (one per config);
 only the orchestrator synthesizes K.
 
@@ -52,6 +59,8 @@ memberships exact (e.g. c2 kex 607/1807 vs truth 600/1800).
 ## Layout
 
 - `skills/clustering/SKILL.md` — the skill
+- `skills/clustering/scripts/jev_state.py` — fit logs → jev state (`--selfcheck` runs its test)
+- `skills/clustering/references/jev-questions.json` — jev question set + decision rules
 - `.codex-plugin/plugin.json` — Codex CLI plugin manifest
 - `.agents/plugins/marketplace.json` — Codex CLI marketplace
 - `.claude-plugin/plugin.json` — plugin manifest

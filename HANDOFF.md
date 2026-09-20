@@ -1,6 +1,6 @@
 # HANDOFF: `clustering` skill — residue-cluster counting for global fits (built & validated)
 
-**Written:** 2026-08-07 · **Updated:** 2026-08-08 (model contracts + dual-runtime verification) · **Working dir:** `/Users/donghanlee/work/projects/clustering` (renamed from `.../globalfit` on 2026-08-07) · git repo root moved from `$HOME` into this folder on 2026-08-08; the skill now lives here as a plugin (`skills/clustering/SKILL.md`)
+**Written:** 2026-08-07 · **Updated:** 2026-09-20 (jev cross-check step) · **Working dir:** `/Users/donghanlee/work/projects/clustering` (renamed from `.../globalfit` on 2026-08-07) · git repo root moved from `$HOME` into this folder on 2026-08-08; the skill now lives here as a plugin (`skills/clustering/SKILL.md`)
 
 ## Goal
 A Claude Code skill that, given a program fitting multi-residue data with shared
@@ -32,6 +32,26 @@ agent can pick up follow-on work (new scenarios, skill refinements).
   Claude `claude plugin install clustering@clustering` (marketplace source =
   this dir), Codex `codex plugin marketplace add <this dir>` +
   `codex plugin add clustering@clustering`.
+
+2026-09-20 addendum — jev cross-check (SKILL.md Execution step 6):
+- jev (TypeSafe "System One" judgment model, MCP server `jev` configured in
+  both `~/.claude.json` and `~/.codex/config.toml`) is used as a gate on the
+  orchestrator's K before reporting. `scripts/jev_state.py fit-full.log
+  [--groups fit-gA.log ...]` parses the `##### model_comparison` /
+  `##### jackknife` blocks into a compact state (red χ², jackknife rel SE,
+  chi2_glob-descending ranking, K-global total AICc with **total n**);
+  `references/jev-questions.json` holds the 4 questions and the `_rules` text
+  that must be prepended to each.
+- Validated on the autoimprove harness fixtures (`~/.claude/autoimprove-clustering/`,
+  answers in `answers/*.json`): t1 K=1 (none 1.00 / K1 0.92), h5 K=1 with red χ²
+  1.06 (none 0.93 / K1 0.96), h1 K=3 trap where K=4 AICc is 0.11 lower
+  (K3 0.85, "split C justified" 0.21), t3 K=2 with real parsed logs
+  (strong 0.87 / K2 0.93, all `act`).
+- Lessons: jev only sees the `question` text, so every rule goes there; score
+  levels must describe one axis each (mixing "AICc gain small" with "group
+  red χ² ≤ 1" in one level split the distribution); hand-built states without
+  the chi2_glob ranking and the hypotheses AICc table left t3 at `review`.
+- No HTTP client was written — both runtimes already have the MCP server.
 
 ## What worked
 - Skill file: `/Users/donghanlee/.claude/skills/clustering/SKILL.md` (frontmatter `name: clustering`; dir was `counting-residue-clusters` before rename on 2026-08-07). **[still applied]**
