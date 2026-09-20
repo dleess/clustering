@@ -23,6 +23,34 @@ claude plugin marketplace add dleess/clustering
 claude plugin install clustering@clustering
 ```
 
+### jev MCP server (optional, enables the cross-check step)
+
+The skill's final cross-check uses [jev](https://www.npmjs.com/package/jev-mcp),
+TypeSafe's judgment model, through the `jev-mcp` server. It needs a TypeSafe
+API key (`TYPESAFE_API_KEY`). Without the server the skill still runs and
+simply skips step 5.
+
+Claude Code:
+
+```bash
+claude mcp add jev -s user -e TYPESAFE_API_KEY=<your key> -- npx -y jev-mcp
+```
+
+Codex CLI — add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.jev]
+command = "npx"
+args = ["-y", "jev-mcp"]
+startup_timeout_sec = 60
+
+[mcp_servers.jev.env]
+TYPESAFE_API_KEY = "<your key>"
+```
+
+Verify with the `jev_models` tool in a new session; it lists `jev-latest`
+when the key works.
+
 ## What it does
 
 The `clustering` skill triggers on cluster/grouping questions about

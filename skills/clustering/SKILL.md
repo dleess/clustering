@@ -25,6 +25,12 @@ item the user already stated):
    location, and how to toggle residues on/off in the config.
 2. **Which parameters are global?** Names of the shared parameter(s); the
    **primary** one (first listed, e.g. kex) is used for z-scores and clustering.
+3. **Is the `jev` MCP server available?** Check your tool list for `jev_ask`.
+   If absent, tell the user once that the final cross-check (Execution step 6)
+   will be skipped and how to enable it: `claude mcp add jev -s user -e
+   TYPESAFE_API_KEY=<key> -- npx -y jev-mcp` (Claude Code) or an
+   `[mcp_servers.jev]` block in `~/.codex/config.toml` (Codex; see README).
+   Do not block on it.
 
 Then locate in the program's output: global chi², parameter count k, total data points n, per-residue
    `chi2_glob`/`chi2_indiv`/`dAICc`/`z`, jackknife block, per-residue individual
