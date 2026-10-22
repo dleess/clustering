@@ -94,3 +94,13 @@ agent can pick up follow-on work (new scenarios, skill refinements).
 - The skill's Execution section assumes the runner supports parallel subagents (Claude Code Agent tool); on runtimes without it the skill still works but runs serially — unverified.
 - Whether `~/.claude/skills/counting-residue-clusters` → `clustering` rename left any stale references elsewhere: none known, but only the skills dir itself was checked.
 - Test-agent success used prompts that named the fit command and config format explicitly; skill relies on its "Setup" section to elicit these in real use — real-data ergonomics unverified.
+
+## 2026-10-22 addendum 2 - refactor + debugging (v0.2.1)
+
+- `jev_state.py` was split into single-purpose functions (`read_block`, `finite_or_none`, `load_fit`, `resolve_keys`, `check_partition`, `hypothesis_entry`, `build_state`, `parse_argv`, `main(argv)`) with named constants `DELTA_KEX_SIGMA` and `OUTPUT_INDENT`. The refactor was verified byte-identical against the baselines from e0a4a7d.
+- BUG-A: `global.kex` falls back to `model_comparison` `per_residue[0].kex_global` when the jackknife block is absent (it was null before).
+- BUG-B: K-global hypothesis objects gain `shared_groups` and `individuals`. Hypotheses that contain single-residue groups are keyed `K{shared}_plus_individuals_global`; pure K-group hypotheses keep `K{n}_global`. A jev A/B run (structure question, 3 repeats) showed why: with the old `K2_global` key plus the new fields, m1 (one main cluster + R6) was classified K2 (wrong); with the new key it was K1_plus_individuals at confidence 0.77-0.82 (old key without fields: 0.39-0.48). m2 rose from 0.26-0.36 to 0.53-0.56; g3 is unchanged (K3, 0.81-0.85).
+- SKILL.md also spells out the `jev_ask` call (inline state, all 4 questions with `_rules` substituted); a fresh g3 run had called it with an empty question list.
+- BUG-E: a block on the last line without a trailing newline now parses.
+- BUG-C/D: SKILL.md makes the jev cross-check required whenever `jev_ask` is available and gives recipes for K-group, one-main-plus-individuals, and multi-hypothesis state objects. README wording matches.
+- Motivation: two fresh end-to-end runs skipped the jev gate that the plugin advertises, so the step is now stated as required.

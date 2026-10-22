@@ -1,7 +1,7 @@
 {
   "name": "clustering",
   "description": "Decide how many clusters K of residues share global parameters in multi-residue global fits (reduced chi² gate, AICc structure selection, jackknife, chi2_glob outlier ranking).",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": {
     "name": "Donghan Lee"
   },

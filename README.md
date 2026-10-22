@@ -23,12 +23,11 @@ claude plugin marketplace add dleess/clustering
 claude plugin install clustering@clustering
 ```
 
-### jev MCP server (optional, enables the cross-check step)
+### jev MCP server (recommended; enables the required cross-check step)
 
 The skill's final cross-check uses [jev](https://www.npmjs.com/package/jev-mcp),
 TypeSafe's judgment model, through the `jev-mcp` server. It needs a TypeSafe
-API key (`TYPESAFE_API_KEY`). Without the server the skill still runs and
-simply skips step 5.
+API key (`TYPESAFE_API_KEY`). Without the server the skill still runs and skips step 5; with it, step 5 always runs before K is reported.
 
 Claude Code:
 
@@ -68,13 +67,13 @@ procedure:
    values of the primary global parameter, per-group fits, total-AICc
    structure selection with **n = total data points in every hypothesis**.
 
-5. **jev cross-check** (optional, when the `jev` MCP server is configured) —
+5. **jev cross-check** (required whenever the `jev` MCP server is configured) —
    `scripts/jev_state.py` turns the fit logs into a compact state and
    `references/jev-questions.json` holds a fixed question set (evidence
    strength, selected structure, split-further, more-fits-needed). Undefined
    numbers are `null`; `--groups` logs must partition the full fit, otherwise
    it exits 2 with a `jev_state:` message. jev is a gate on the orchestrator's
-   conclusion, never an override of the red χ² gate or a failed group refit.
+   conclusion, never an override of the red χ² gate or a failed group refit. Single-residue group logs are reported as `individuals`, and such a hypothesis is keyed `K<shared>_plus_individuals_global`.
 
 Fit runs are dispatched as parallel computation agents (one per config);
 only the orchestrator synthesizes K.
