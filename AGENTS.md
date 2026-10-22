@@ -1,10 +1,10 @@
 # PROJECT KNOWLEDGE BASE: clustering
 
-**Generated:** 2026-10-22 · **Commit:** 9260b1e · **Branch:** feat/robust-jev-state
+**Generated:** 2026-10-22 · **Commit:** e0a4a7d · **Branch:** refactor/jev-state-debug
 
 ## OVERVIEW
 
-Claude/Codex plugin (`clustering`, v0.2.0 in progress) that answers "how many clusters of residues share one exchange model?" for NMR global fits produced by sherekhan (`github.com/deepnmr/sherekhan`). The skill runs fits, applies AICc/chi2 decision rules, and cross-checks the result with a jev judgment model via a state JSON built by `jev_state.py`.
+Claude/Codex plugin (`clustering`, v0.2.1) that answers "how many clusters of residues share one exchange model?" for NMR global fits produced by sherekhan (`github.com/deepnmr/sherekhan`). The skill runs fits, applies AICc/chi2 decision rules, and cross-checks the result with a jev judgment model via a state JSON built by `jev_state.py`.
 
 ## STRUCTURE
 
@@ -41,19 +41,28 @@ clustering/
 ## CODE MAP
 
 `skills/clustering/scripts/jev_state.py`:
-- `block(text, name)`: extracts a named JSON block from a sherekhan fit log.
-- `_r(x, nd=None)`: rounds finite numbers; returns `None` for None/nan/inf.
-- `entry(path)`: parses one fit log into per-residue and global fields.
-- `aicc(chi2, k, n)`: AICc; `None` when n-k-1 <= 0.
-- `main(paths, groups=())`: `paths[0]` is the full fit; `groups` are group fits of one K-global hypothesis.
+- `DELTA_KEX_SIGMA = 2.0`: influential-residue threshold (mirrors the sk_run jackknife `*` flag).
+- `OUTPUT_INDENT = 1`: indent passed to `json.dumps` for stdout.
 - `InputError`: bad input; the CLI prints `jev_state: <msg>` and exits 2.
-- `_selfcheck()`: built-in tests, run with `--selfcheck`.
+- `read_block(text, name)`: extracts a named JSON block from a sherekhan fit log (also accepts a block on the last line without newline).
+- `finite_or_none(x, nd=None)`: rounds finite numbers; returns `None` for None/nan/inf.
+- `load_fit(path)`: parses one fit log into per-residue and global fields; `global.kex` falls back to `model_comparison` when the jackknife is absent.
+- `aicc(chi2, k, n)`: AICc; `None` when n-k-1 <= 0.
+- `resolve_keys(paths)`: maps each input to a unique key (basename, or normalized path when basenames collide).
+- `check_partition(full, groups)`: validates that the group fits partition the full fit's residues.
+- `hypothesis_entry(groups, n)`: builds the K-global hypothesis object (with `shared_groups` and `individuals`).
+- `hypothesis_name(h, n_groups)`: `K{n}_global` for shared clusters only, `K{shared}_plus_individuals_global` when single-residue groups are present (matches the jev structure options).
+- `build_state(paths, groups=())`: `paths[0]` is the full fit; `groups` are group fits of one K-global hypothesis.
+- `parse_argv(args)`: splits argv into `(paths, groups)`.
+- `main(argv) -> int`: CLI dispatch; returns the exit code.
+- `_selfcheck()`: built-in tests, run with `--selfcheck`; every log is written through `log_text(mc, jk=None)`.
 
 ## CONVENTIONS
 
 - Script is stdlib-only (`json`, `math`, `os`, `sys`; `tempfile` inside `_selfcheck`). No third-party imports.
 - Tests live in `_selfcheck()`; no separate test framework or test files.
 - Output keys and rounding are a contract with the jev `_rules` and with the copy kbsi bundles byte-for-byte. Keep them stable for valid inputs.
+- Hypothesis objects may only gain fields; never rename `K{n}_global` for pure K-group hypotheses. Hypotheses with single-residue groups are keyed `K{shared}_plus_individuals_global` because jev misread `K{len}_global` as len shared clusters.
 - Output is `json.dumps(..., indent=1)` to stdout.
 - Version bumps touch both plugin manifests in the same commit.
 - Docs must name only paths that exist or are URLs.
@@ -91,6 +100,7 @@ cd sherekhan/demo/multi/g2 && ../../../../venv/bin/python ../../../sk_run.py g2.
 - sherekhan writes `null` for nan/inf values (`_finite_json` in `sk_run.py`), so z_kex, aicc, delta_aicc, and kex can be null.
 - The jackknife block is absent when there are fewer than 2 residues or jackknife is off.
 - sherekhan never writes an `influential` key; influential residues are derived from `delta_kex` and `se` (flag if abs(delta_kex) > 2*se, se > 0).
+- The jev step is required whenever `jev_ask` is available.
 - `codex exec` needs `< /dev/null` or it hangs waiting on stdin.
 - Installed skill copies can be stale; reinstall the plugin after a version bump.
 - Historical paths in HANDOFF.md (under `/Users/donghanlee/work/projects`, `~/.claude/skills/clustering`) do not exist as current state.

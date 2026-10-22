@@ -1,6 +1,6 @@
 {
   "name": "clustering",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Decide how many clusters K of residues share global parameters in multi-residue global fits.",
   "author": {
     "name": "Donghan Lee",
