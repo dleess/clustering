@@ -1,5 +1,5 @@
 {
-  "_usage": "jev_ask(state=<output of scripts/jev_state.py>, questions=<this file's 'questions'>). Questions are independent; put every rule in the question text, jev sees nothing else.",
+  "_usage": "jev_ask(state=<output of <skill-dir>/scripts/jev_state.py>, questions=<this file's 'questions'>). Questions are independent; put every rule in the question text, jev sees nothing else.",
   "_rules": "Relaxation-dispersion global fitting; residues share global parameters kex and pB. Decision rules: (1) if the 1-global fit has red_chi2 = chi2/(n-k) <= 1, K=1 and any split is overfitting. (2) If red_chi2 > 1 but preferred=global with jackknife rel SE of a few percent and no influential flags, K=1 still holds; a single residue flagged better=individual with |dAICc| < 2 is noise. (3) Otherwise rank residues by chi2_glob descending; a residue is an individual only if excluding it restores the remaining fit to preferred=global with small jackknife SE. (4) Otherwise compare total AICc of 1-global vs K-global computed on the SAME total n; a K-global hypothesis counts only if every group has preferred=global and small jackknife SE. Never split a group further once its own red_chi2 <= 1, even if AICc drops slightly.",
   "questions": [
     {

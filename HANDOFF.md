@@ -1,6 +1,6 @@
 # HANDOFF: `clustering` skill — residue-cluster counting for global fits (built & validated)
 
-**Written:** 2026-08-07 · **Updated:** 2026-09-20 (jev cross-check step) · **Working dir:** `/Users/donghanlee/work/projects/clustering` (renamed from `.../globalfit` on 2026-08-07) · git repo root moved from `$HOME` into this folder on 2026-08-08; the skill now lives here as a plugin (`skills/clustering/SKILL.md`)
+**Written:** 2026-08-07 · **Updated:** 2026-09-20 (jev cross-check step) · **Working dir:** repo root (clone of github.com/dleess/clustering; renamed from `.../globalfit` on 2026-08-07) · git repo root moved from `$HOME` into this folder on 2026-08-08; the skill now lives here as a plugin (`skills/clustering/SKILL.md`)
 
 ## Goal
 A Claude Code skill that, given a program fitting multi-residue data with shared
@@ -53,8 +53,17 @@ agent can pick up follow-on work (new scenarios, skill refinements).
   the chi2_glob ranking and the hypotheses AICc table left t3 at `review`.
 - No HTTP client was written — both runtimes already have the MCP server.
 
+2026-10-22 addendum - jev_state hardening (v0.2.0):
+- `scripts/jev_state.py` now emits `null` for every undefined number (no traceback on null z_kex/aicc/delta_aicc/kex or n-k-1<=0).
+- `jackknife.influential` is computed from `delta_kex` and `se` (abs(delta_kex) > 2*se, se > 0), matching sk_run.py's `*` flag; it was always [] before because sk_run.py never emits that key.
+- Logs sharing a basename are keyed by path; an exact duplicate input is rejected.
+- `--groups` must partition the full fit (disjoint residues, union == full residues, sum of group n == full n); otherwise exit 2.
+- Errors print one `jev_state: <reason>` line to stderr and exit 2; `--help` exits 0.
+- SKILL.md step 6 resolves `scripts/jev_state.py` and `references/jev-questions.json` from `<skill-dir>`; root `AGENTS.md` added; both manifests at 0.2.0.
+- kbsi bundles a byte-identical copy of the pre-0.2.0 script at `packages/omo-senpi/skills/nmr/scripts/clustering/jev_state.py`; it should be re-synced to this version.
+
 ## What worked
-- Skill file: `/Users/donghanlee/.claude/skills/clustering/SKILL.md` (frontmatter `name: clustering`; dir was `counting-residue-clusters` before rename on 2026-08-07). **[still applied]**
+- Skill file (historical path; current file is `skills/clustering/SKILL.md`): `~/.claude/skills/clustering/SKILL.md` (frontmatter `name: clustering`; dir was `counting-residue-clusters` before rename on 2026-08-07). **[still applied]**
 - Decision procedure encoded (from user's manual §6–8, sherekhan `MANUAL.en.md` covers the same ground):
   1. reduced chi² gate: `chi2_global/(n−k) ≤ 1` → K=1, stop, no more runs;
   2. whole-dataset AICc verdict + jackknife rel SE small → K=1;
@@ -72,14 +81,14 @@ agent can pick up follow-on work (new scenarios, skill refinements).
 - A skill loaded via the Skill tool mid-session can serve a stale cached version (session-start snapshot), even after the file on disk changed. Content on disk was correct; restart the session (or read the file directly) when verifying skill edits.
 
 ## Key files & commands
-- `/Users/donghanlee/.claude/skills/clustering/SKILL.md` — the skill. Registered as `/clustering`.
-- `/Users/donghanlee/work/projects/sherekhan/` — fit program repo. `sk_run.py` is the fitter; `demo/multi/make_multi.py` is the generator template mine was adapted from; `MANUAL.en.md` documents the statistics.
-- Scratchpad from the 2026-08-07 session is GONE (its `make_goal_scenarios.py` and `goalcheck/c{1..4}` with it). Equivalent scenarios come straight from the repo generator: `<venv>/bin/python /Users/donghanlee/work/projects/sherekhan/demo/multi/make_multi.py` writes m1–m4/g2/g3 (data + conf + truth.json) into `demo/multi/<name>/`; move `truth.json` aside before handing a dir to a test agent.
-- Run a fit: `cd <scenario dir> && <venv>/bin/python3 /Users/donghanlee/work/projects/sherekhan/sk_run.py run.conf` — prints human tables plus strict-JSON blocks `##### model_comparison` and `##### jackknife`; residue toggling via `"residues": [{"name":"R1","flag":"on"|"off"}]` in the JSON conf. c1 run takes <1 s.
+- `skills/clustering/SKILL.md` — the skill (installed via the plugin; the old `~/.claude/skills/clustering` copy is historical). Registered as `/clustering`.
+- a clone of github.com/deepnmr/sherekhan (`<sherekhan>`) — fit program repo. `sk_run.py` is the fitter; `demo/multi/make_multi.py` is the generator template mine was adapted from; `MANUAL.en.md` documents the statistics.
+- Scratchpad from the 2026-08-07 session is GONE (its `make_goal_scenarios.py` and `goalcheck/c{1..4}` with it). Equivalent scenarios come straight from the repo generator: `<venv>/bin/python <sherekhan>/demo/multi/make_multi.py` writes m1–m4/g2/g3 (data + conf + truth.json) into `demo/multi/<name>/`; move `truth.json` aside before handing a dir to a test agent.
+- Run a fit: `cd <scenario dir> && <venv>/bin/python3 <sherekhan>/sk_run.py run.conf` — prints human tables plus strict-JSON blocks `##### model_comparison` and `##### jackknife`; residue toggling via `"residues": [{"name":"R1","flag":"on"|"off"}]` in the JSON conf. c1 run takes <1 s.
 
 ## Next steps
 1. Nothing required — goal met. If the user wants more hardening, the untested spots are: Step 3 positive case (single-outlier contamination, cf. sherekhan `demo/multi` m1–m4 scenarios) and unequal group sizes / K-group + outlier combined.
-2. If scratchpad is gone, recreate: `python3 -m venv venv && venv/bin/pip install numpy scipy matplotlib`, then rerun `make_goal_scenarios.py` (it hardcodes REPO=`/Users/donghanlee/work/projects/sherekhan` and writes relative to its own location).
+2. If scratchpad is gone, recreate: `python3 -m venv venv && venv/bin/pip install numpy scipy matplotlib`, then rerun `make_goal_scenarios.py` (it hardcodes REPO=`<sherekhan>` (historical; set it to your sherekhan clone) and writes relative to its own location).
 
 ## Open questions / risks
 - The skill's Execution section assumes the runner supports parallel subagents (Claude Code Agent tool); on runtimes without it the skill still works but runs serially — unverified.
