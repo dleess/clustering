@@ -113,14 +113,14 @@ The orchestrator then:
    wave are parallel.
 6. **jev cross-check (before reporting, if the `jev` MCP server is available).**
    Build the state from the logs and ask jev the fixed question set:
-   `python3 scripts/jev_state.py fit-full.log [--groups fit-gA.log fit-gB.log ...]`
-   → `jev_ask(state=<that JSON>, questions=<references/jev-questions.json "questions">)`.
+   `python3 <skill-dir>/scripts/jev_state.py fit-full.log [--groups fit-gA.log fit-gB.log ...]` where `<skill-dir>` is the directory containing this SKILL.md (use its absolute path; the fits run in the scenario dir)
+   → `jev_ask(state=<that JSON>, questions=<skill-dir>/references/jev-questions.json "questions">)`.
    Prepend the file's `_rules` text to every question (replace `<_rules>`).
    Read it as a gate, not an oracle: if `structure` differs from your K or any
    answer is `review`/`abstain`, re-examine the numbers against the decision
    procedure (usually a missing group refit, per-group n in the AICc, or a
    group with red χ² ≤ 1 being split) and only then report. Never let a jev
-   `act` override a failed red χ² gate or a failed group refit.
+   `act` override a failed red χ² gate or a failed group refit. The script exits 2 with a `jev_state:` message when `--groups` logs do not partition the full fit (disjoint, all residues, same total n) or a log is unreadable - fix the inputs, never hand-build the state; undefined numbers appear as null.
 
 ## Quick reference
 
