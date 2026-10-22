@@ -71,9 +71,10 @@ procedure:
 5. **jev cross-check** (optional, when the `jev` MCP server is configured) —
    `scripts/jev_state.py` turns the fit logs into a compact state and
    `references/jev-questions.json` holds a fixed question set (evidence
-   strength, selected structure, split-further, more-fits-needed). jev is a
-   gate on the orchestrator's conclusion, never an override of the red χ²
-   gate or a failed group refit.
+   strength, selected structure, split-further, more-fits-needed). Undefined
+   numbers are `null`; `--groups` logs must partition the full fit, otherwise
+   it exits 2 with a `jev_state:` message. jev is a gate on the orchestrator's
+   conclusion, never an override of the red χ² gate or a failed group refit.
 
 Fit runs are dispatched as parallel computation agents (one per config);
 only the orchestrator synthesizes K.
@@ -84,8 +85,19 @@ Tested against synthetic sherekhan scenarios with known truth (seed 4242,
 6–8 residues, 2 fields, 1% noise): K = 1, 2, 3, 4 all recovered exactly,
 memberships exact (e.g. c2 kex 607/1807 vs truth 600/1800).
 
+## Development
+
+- Self-test the state builder (stdlib only, any python3 >= 3.8):
+  `python3 skills/clustering/scripts/jev_state.py --selfcheck`
+- Regenerate the fixtures from the sherekhan simulator:
+  `git clone https://github.com/deepnmr/sherekhan`, create a venv with
+  numpy, scipy and matplotlib, then run `python demo/multi/make_multi.py`
+  and `cd demo/multi/g2 && python ../../../sk_run.py g2.conf > fit-full.log`.
+- Validate the plugin: `claude plugin validate .`
+
 ## Layout
 
+- `AGENTS.md` - knowledge base for coding agents
 - `skills/clustering/SKILL.md` — the skill
 - `skills/clustering/scripts/jev_state.py` — fit logs → jev state (`--selfcheck` runs its test)
 - `skills/clustering/references/jev-questions.json` — jev question set + decision rules
