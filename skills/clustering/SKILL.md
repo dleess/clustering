@@ -30,7 +30,7 @@ item the user already stated):
    will be skipped and how to enable it: `claude mcp add jev -s user -e
    TYPESAFE_API_KEY=<key> -- npx -y jev-mcp` (Claude Code) or an
    `[mcp_servers.jev]` block in `~/.codex/config.toml` (Codex; see README).
-   Do not block on it.
+   Do not block on it. If `jev_ask` IS available, Execution step 6 is required before you report K.
 
 Then locate in the program's output: global chi², parameter count k, total data points n, per-residue
    `chi2_glob`/`chi2_indiv`/`dAICc`/`z`, jackknife block, per-residue individual
@@ -111,7 +111,7 @@ The orchestrator then:
 5. Results that spawn new hypotheses (a group fails internally, a new gap
    appears) start another parallel wave. Waves are sequential; runs within a
    wave are parallel.
-6. **jev cross-check (before reporting, if the `jev` MCP server is available).**
+6. **jev cross-check (required when `jev_ask` is available; skip only when it is absent).**
    Build the state from the logs and ask jev the fixed question set:
    `python3 <skill-dir>/scripts/jev_state.py fit-full.log [--groups fit-gA.log fit-gB.log ...]` where `<skill-dir>` is the directory containing this SKILL.md (use its absolute path; the fits run in the scenario dir)
    → `jev_ask(state=<that JSON>, questions=<skill-dir>/references/jev-questions.json "questions">)`.
@@ -121,6 +121,11 @@ The orchestrator then:
    procedure (usually a missing group refit, per-group n in the AICc, or a
    group with red χ² ≤ 1 being split) and only then report. Never let a jev
    `act` override a failed red χ² gate or a failed group refit. The script exits 2 with a `jev_state:` message when `--groups` logs do not partition the full fit (disjoint, all residues, same total n) or a log is unreadable - fix the inputs, never hand-build the state; undefined numbers appear as null.
+   - K-group hypothesis: `--groups` one group-fit log per group.
+   - One main cluster + individuals (Step 3): `--groups` the exclusion-refit log plus one single-residue fit log per excluded residue (run those single-residue fits in the same wave as the exclusion refit); the hypothesis key then reads `K<shared>_plus_individuals_global` and lists `shared_groups` and `individuals`.
+   - Several K hypotheses: run the script once per hypothesis and pass jev one state object keyed by hypothesis name, e.g. `{"K2": <state>, "K3": <state>}`.
+   - The `jev_ask` call itself: `state` is the script's JSON object pasted inline (never a file path or `@file`), and `questions` is the full 4-item `questions` array from the file with `<_rules>` replaced by `_rules` in each `question` (never empty, never a subset).
+   Never skip this step because the numbers already look decisive; the final report must quote jev's `structure` answer.
 
 ## Quick reference
 
@@ -140,3 +145,4 @@ The orchestrator then:
 - Using per-group n in the K-global AICc — n is the total, identical across hypotheses.
 - Trusting the jackknife `*` flag with a single strong outlier present (it masks itself; breakdown point = 1).
 - Reporting K without per-cluster refit evidence (Step 4 group fits must each pass internally).
+- Skipping the jev cross-check when `jev_ask` is available.
