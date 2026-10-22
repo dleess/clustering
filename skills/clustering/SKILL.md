@@ -18,8 +18,10 @@ Binary flags hide the cause; magnitudes (reduced chi², chi2_glob ranking) survi
 
 ## Setup — establish before running anything
 
-When this skill is invoked, FIRST ask the user (one question round, skip any
-item the user already stated):
+When this skill is invoked, FIRST establish the three items below. If the prompt or
+config already names the fit command and the global parameters, or the session is
+non-interactive (e.g. `claude -p`, `codex exec`), use those values and do not ask.
+Otherwise ask the user one question round, skipping any item already stated:
 
 1. **Which fit program?** Exact command (e.g. `sk-run run.conf`), config/data
    location, and how to toggle residues on/off in the config.
@@ -72,39 +74,46 @@ If the individual-fit values of the primary global parameter form value groups
 ## Execution — orchestrator + parallel computation agents
 
 The procedure needs several fit runs (Step 3 exclusion refits, Step 4 group
-fits). Never run them serially yourself.
+fits). Fits run in computation agents, dispatched in parallel.
 
-**Codex model contract:** orchestration runs on `gpt-5.6-sol`. If the active
-agent is not already that model, create exactly one orchestration agent with
-`model: "gpt-5.6-sol"` and `fork_turns: "none"`, passing the complete task and
+**Claude contract:** orchestration runs in the current session; do not spawn an
+orchestrator. Dispatch one Agent tool call per config with `model: "haiku"`, all
+in a single message, each with its full assigned-config contract in the prompt.
+Agents may start in the background: after dispatch, wait until every agent has returned its result before any synthesis, and never end the turn while an agent
+is still outstanding. While the Agent tool is available, do not run the fits
+yourself (no shell loops, no backgrounded fits). If the Agent tool is
+unavailable, run the fits yourself as parallel shell jobs and say so in the report.
+
+**Codex contract:** orchestration runs on `gpt-6.1-sol`. If the active agent is
+not already that model, create exactly one orchestration agent with
+`model: "gpt-6.1-sol"` and `fork_turns: "none"`, passing the complete task and
 skill context; that agent owns the workflow below and must not create another
 orchestrator. Every parallel computation agent must be created with
-`model: "gpt-5.6-luna"` and `fork_turns: "none"`, with its full assigned-config
+`model: "gpt-6-luna"` and `fork_turns: "none"`, with its full assigned-config
 contract in the prompt.
-
-**Claude model contract:** orchestration runs on `fable`. If the active agent is
-not already that model, create exactly one orchestration agent (Agent tool) with
-`model: "fable"`, passing the complete task and skill context; that agent owns
-the workflow below and must not create another orchestrator. Every parallel
-computation agent must be created with `model: "haiku"`, with its full
-assigned-config contract in the prompt.
 
 On other runtimes, use the available agent mechanism.
 
 The orchestrator then:
 
-1. Run the initial full global fit (this one is sequential — everything depends
-   on it) and form your hypotheses from its output.
+1. Run the initial full global fit yourself as `fit-full.log` (this one is
+   sequential — everything depends on it; it is the only fit the orchestrator
+   runs directly) and form your hypotheses from its output.
 2. List every config the current step needs (all exclusion variants, all group
    configs, extra K hypotheses). Dispatch **one computation agent per config,
    all in a single message** so they run in parallel.
-3. Each computation agent's contract: copy the base config, toggle the assigned
-   residue flags, run the fit command, parse the output (prefer labelled JSON
+3. Each computation agent's contract: it is given the fit command, the absolute
+   base config path, and the residue flags to set. It copies the base config to
+   `<stem>.conf`, toggles the assigned residue flags, runs the fit command, and
+   writes the output to `fit-<stem>.log` in the scenario dir. Both files are kept
+   (jev_state reads the logs). Stems: `full`, `ex<excluded residues>`,
+   `o<residue>` for single-residue fits, `g<letter>` for groups. It parses the output (prefer labelled JSON
    blocks like `##### model_comparison` / `##### jackknife` over the human
    table), and return ONLY compact JSON:
-   `{config, residues_on, global: {chi2, k, n}, individual: {chi2, k},
+   `{config, log, residues_on, global: {chi2, k, n}, individual: {chi2, k},
    verdict, per_residue: [{resId, chi2_glob, chi2_indiv, dAICc, z, better}],
    jackknife: {value, rel_se_pct, influential}, global_params: {...}}`
+   where `log` is the `fit-<stem>.log` path it wrote.
 4. Synthesis (orchestrator only): collect the JSON results, verify each group
    passes internally, compute total AICc per hypothesis with **total n**,
    decide K, and report. Computation agents never draw conclusions about K.
@@ -123,9 +132,11 @@ The orchestrator then:
    `act` override a failed red χ² gate or a failed group refit. The script exits 2 with a `jev_state:` message when `--groups` logs do not partition the full fit (disjoint, all residues, same total n) or a log is unreadable - fix the inputs, never hand-build the state; undefined numbers appear as null.
    - K-group hypothesis: `--groups` one group-fit log per group.
    - One main cluster + individuals (Step 3): `--groups` the exclusion-refit log plus one single-residue fit log per excluded residue (run those single-residue fits in the same wave as the exclusion refit); the hypothesis key then reads `K<shared>_plus_individuals_global` and lists `shared_groups` and `individuals`.
-   - Several K hypotheses: run the script once per hypothesis and pass jev one state object keyed by hypothesis name, e.g. `{"K2": <state>, "K3": <state>}`.
+   - Several K hypotheses: repeat `--groups` in one call, one set per hypothesis, e.g. `fit-full.log --groups fit-gA.log fit-gB.log --groups fit-gA.log fit-gB.log fit-gC.log`; each set is one hypothesis in the same state.
+   - The script adds a `derived` object (red chi2 and small-SE gate flags, per-hypothesis validity and delta AICc, `selected`, `needs_more_fits`). Pass jev the state unchanged, including `derived`; do not recompute these numbers yourself.
    - The `jev_ask` call itself: `state` is the script's JSON object pasted inline (never a file path or `@file`), and `questions` is the full 4-item `questions` array from the file with `<_rules>` replaced by `_rules` in each `question` (never empty, never a subset).
    Never skip this step because the numbers already look decisive; the final report must quote jev's `structure` answer.
+7. **Stop rule.** Report K when `derived.needs_more_fits` is false and jev answers no to both `split_further` and `more_fits_needed`. Otherwise run the next wave the `derived` values and jev answers imply (step 5).
 
 ## Quick reference
 
@@ -146,3 +157,4 @@ The orchestrator then:
 - Trusting the jackknife `*` flag with a single strong outlier present (it masks itself; breakdown point = 1).
 - Reporting K without per-cluster refit evidence (Step 4 group fits must each pass internally).
 - Skipping the jev cross-check when `jev_ask` is available.
+- Synthesizing before every computation agent has returned.
