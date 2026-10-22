@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Turn sk-run fit logs into a compact state for a jev cross-check.
 
-    python3 jev_state.py fit-full.log [--groups fit-gA.log fit-gB.log ...] > state.json
+    python3 jev_state.py fit-full.log [--groups g1.log ... [--groups ...]] > state.json
 
 Each log contributes one entry keyed by its file name. Per-residue rows are
 sorted by chi2_glob descending (the contamination-proof ranking). Feed the
@@ -17,6 +17,10 @@ import sys
 # Mirrors the sk_run jackknife '*' flag: |delta_kex| > DELTA_KEX_SIGMA * se.
 DELTA_KEX_SIGMA = 2.0
 OUTPUT_INDENT = 1
+# A hypothesis is valid when every multi-residue group is global with rel SE below this.
+VALID_REL_SE_PCT = 5.0
+# The full fit passes the gate when its global jackknife rel SE is below this.
+GATE_REL_SE_PCT = 5.0
 
 
 class InputError(ValueError):
@@ -166,23 +170,89 @@ def hypothesis_name(h, n_groups):
     return f"K{n_groups}_global"
 
 
-def build_state(paths, groups=()):
-    """paths[0] is the full fit; `groups` are group-fit logs of ONE K-global hypothesis."""
-    key = resolve_keys(list(paths) + list(groups))
-    files = list(key)
+def rel_se_below(entry, limit):
+    rel = entry["jackknife"]["rel_se_pct"]
+    return rel is not None and rel < limit
+
+
+def unique_name(name, taken):
+    out, i = name, 2
+    while out in taken:
+        out = f"{name}_{i}"
+        i += 1
+    return out
+
+
+def derive(full, hyp_groups):
+    """Decision facts for jev. `full` is the full-fit entry; `hyp_groups` maps each
+    hypothesis key to its group entries."""
+    n = full["global"]["n"]
+    red = full["global"]["red_chi2"]
+    gate = {
+        "red_chi2_le_1": red is not None and red <= 1,
+        "global_preferred_small_se": full["preferred"] == "global"
+        and rel_se_below(full, GATE_REL_SE_PCT),
+    }
+    k1 = full["global"]["aicc"]
+    hyps = {"K1_global": {"valid": True, "aicc": k1, "delta_aicc_vs_K1": 0.0 if k1 is not None else None}}
+    for name, groups in hyp_groups.items():
+        aic = hypothesis_entry(groups, n)["aicc"]
+        valid = all(
+            g["preferred"] == "global" and rel_se_below(g, VALID_REL_SE_PCT)
+            for g in groups
+            if len(g["residues_on"]) >= 2
+        )
+        delta = None if aic is None or k1 is None else round(aic - k1, 1)
+        hyps[name] = {"valid": valid, "aicc": aic, "delta_aicc_vs_K1": delta}
+    if gate["red_chi2_le_1"] or gate["global_preferred_small_se"]:
+        selected = "K1_global"
+    else:
+        ranked = [
+            (v["aicc"], name)
+            for name, v in hyps.items()
+            if name != "K1_global" and v["valid"] and v["aicc"] is not None
+        ]
+        selected = min(ranked, key=lambda c: c[0])[1] if ranked else None
+    return {
+        "full_fit_gate": gate,
+        "hypotheses": hyps,
+        "selected": selected,
+        "needs_more_fits": selected is None,
+    }
+
+
+def build_state(paths, group_sets=()):
+    """paths[0] is the full fit; each group set is one K-global hypothesis.
+    A flat list of log paths counts as one set."""
+    if group_sets and isinstance(group_sets[0], str):
+        group_sets = [group_sets]
+    sets = [list(s) for s in group_sets]
+    resolve_keys(paths)  # duplicates within one list are errors
+    for s in sets:
+        resolve_keys(s)
+    files = []
+    for f in [*paths, *(f for s in sets for f in s)]:
+        nf = os.path.normpath(f)
+        if nf not in files:  # a log may be shared across sets
+            files.append(nf)
+    key = resolve_keys(files)
     state = {key[f]: load_fit(f) for f in files}
-    full = state[key[files[0]]]
+    full = state[key[os.path.normpath(paths[0])]]
     n = full["global"]["n"]  # total n, identical in every hypothesis
     hyp = {
         "K1_global": {"aicc": full["global"]["aicc"]},
         "individual": {"aicc": full["individual"]["aicc"]},
     }
-    if groups:
-        gs = [state[key[f]] for f in files[len(paths) :]]
+    hyp_groups = {}
+    for s in sets:
+        gs = [state[key[os.path.normpath(f)]] for f in s]
         check_partition(full, gs)
         h = hypothesis_entry(gs, n)
-        hyp[hypothesis_name(h, len(gs))] = h
+        name = unique_name(hypothesis_name(h, len(gs)), hyp)
+        hyp[name] = h
+        hyp_groups[name] = gs
     state[f"hypotheses_total_n_{n}"] = hyp
+    state["derived"] = derive(full, hyp_groups)
     return state
 
 
@@ -204,7 +274,7 @@ def _selfcheck():
         put(path, log_text(mc, jk))
         return path
 
-    def group(path, labels, n):
+    def group(path, labels, n, pref="individual", se=None):
         rows = [
             {"label": L, "chi2_global": 30.0, "chi2": 10.0, "delta_aicc": 0.0,
              "z_kex": 0.0, "preferred": "individual", "kex": 1.0}
@@ -213,10 +283,11 @@ def _selfcheck():
         m = {
             "global": {"chi2": 100.0, "k": 10, "n": n, "aicc": 130.0},
             "individual": {"chi2": 50.0, "k": 20, "aicc": 100.0},
-            "preferred": "individual",
+            "preferred": pref,
             "per_residue": rows,
         }
-        return write_log(path, m)
+        jk = None if se is None else {"kex_full": 800.0, "se": se, "per_residue": []}
+        return write_log(path, m, jk)
 
     mc = {
         "global": {"chi2": 100.0, "k": 10, "n": 60, "aicc": 130.0},
@@ -334,9 +405,9 @@ def _selfcheck():
         g1 = group(os.path.join(d, "g1", "fit.log"), ["R1"], 30)
         g2 = group(os.path.join(d, "g2", "fit.log"), ["R2"], 30)
         s = build_state([full], [g1, g2])
-        assert set(s) == {full, g1, g2, "hypotheses_total_n_60"}
+        assert set(s) == {full, g1, g2, "hypotheses_total_n_60", "derived"}
         assert s["hypotheses_total_n_60"]["K0_plus_individuals_global"]["chi2"] == 200.0
-        assert "duplicate input" in raises(lambda: build_state([full], [full]))
+        assert "duplicate input" in raises(lambda: build_state([full], [[g1, g1]]))
         ov = group(os.path.join(d, "ov", "fit.log"), ["R1", "R2"], 30)
         assert "more than one group" in raises(lambda: build_state([full], [ov, g1]))
         assert "missing ['R2']" in raises(lambda: build_state([full], [g1]))
@@ -350,6 +421,70 @@ def _selfcheck():
         os.makedirs(os.path.dirname(none))
         put(none, "junk\n")  # deliberately has no model_comparison block
         assert "no model_comparison block" in raises(lambda: build_state([none]))
+    import contextlib
+    import io
+
+    def run_main(args):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = main(args)
+        return code, out.getvalue(), err.getvalue()
+
+    with tempfile.TemporaryDirectory() as d:
+
+        def at(name):
+            return os.path.join(d, name, "fit.log")
+
+        plain = write_log(at("plain"), mc)
+        d_plain = build_state([plain])["derived"]
+        assert d_plain["selected"] is None and d_plain["needs_more_fits"] is True
+        assert d_plain["full_fit_gate"] == {"red_chi2_le_1": False, "global_preferred_small_se": False}
+
+        gate_mc = dict(mc, preferred="global", **{"global": dict(mc["global"], chi2=40.0)})
+        gate = write_log(at("gate"), gate_mc, {"kex_full": 800.0, "se": 20.0, "per_residue": []})
+        d_gate = build_state([gate])["derived"]
+        assert d_gate["full_fit_gate"]["red_chi2_le_1"] and d_gate["full_fit_gate"]["global_preferred_small_se"]
+        assert d_gate["selected"] == "K1_global" and d_gate["needs_more_fits"] is False
+
+        mc3 = dict(mc, per_residue=mc["per_residue"] + [dict(mc["per_residue"][0], label="R3")])
+        full3 = write_log(at("f3"), mc3)
+        single = group(at("r3"), ["R3"], 20)
+        bad = group(at("bad"), ["R1", "R2"], 40, pref="individual", se=4.0)
+        d_bad = build_state([full3], [[bad, single]])["derived"]
+        assert d_bad["hypotheses"]["K1_plus_individuals_global"]["valid"] is False
+        assert d_bad["selected"] is None
+        wide = group(at("wide"), ["R1", "R2"], 40, pref="global", se=60.0)
+        d_wide = build_state([full3], [[wide, single]])["derived"]
+        assert d_wide["hypotheses"]["K1_plus_individuals_global"]["valid"] is False
+
+        good = group(at("good"), ["R1", "R2"], 40, pref="global", se=4.0)
+        gc = group(at("gc"), ["R1"], 20)
+        gd = group(at("gd"), ["R2"], 20)
+        ge = group(at("ge"), ["R3"], 20)
+        d_two = build_state([full3], [[good, single], [gc, gd, ge]])["derived"]
+        assert d_two["hypotheses"]["K1_plus_individuals_global"]["valid"]
+        assert d_two["hypotheses"]["K0_plus_individuals_global"]["valid"]
+        assert d_two["selected"] == "K1_plus_individuals_global"
+
+        g1 = group(at("g1"), ["R1"], 30)
+        g2 = group(at("g2"), ["R2"], 30)
+        g3 = group(at("g3"), ["R2"], 30)
+        code, out, _ = run_main([plain, "--groups", g1, g2, "--groups", g1, g3])
+        assert code == 0
+        st = json.loads(out)
+        assert list(st["hypotheses_total_n_60"]) == [
+            "K1_global", "individual", "K0_plus_individuals_global", "K0_plus_individuals_global_2",
+        ]
+        assert list(st)[-1] == "derived"
+        code, _, err = run_main([plain, "--groups", g1, g1])
+        assert code == 2 and err.startswith("jev_state: duplicate input")
+        for args, msg in (
+            (["--groups", g1], "full-fit log required"),
+            ([plain, "--groups"], "--groups needs at least one log"),
+            ([plain, "--groups", g1, "--groups"], "--groups needs at least one log"),
+        ):
+            code, _, err = run_main(args)
+            assert code == 2 and msg in err, err
     print("selfcheck ok")
 
 
@@ -357,13 +492,22 @@ USAGE = __doc__ + "\n  --groups fit-gA.log fit-gB.log   add K-global total AICc 
 
 
 def parse_argv(args):
-    """Split argv into (paths, groups); raises InputError on a bad --groups position."""
-    i = args.index("--groups") if "--groups" in args else len(args)
-    if i == 0:
+    """Split argv into (paths, group_sets): every --groups starts one set of logs."""
+    first = args.index("--groups") if "--groups" in args else len(args)
+    paths = args[:first]
+    if not paths:
         raise InputError("full-fit log required before --groups")
-    if i == len(args) - 1 and args[i] == "--groups":
-        raise InputError("--groups needs at least one log")
-    return args[:i], args[i + 1 :]
+    sets = []
+    i = first
+    while i < len(args):
+        j = i + 1
+        while j < len(args) and args[j] != "--groups":
+            j += 1
+        if j == i + 1:
+            raise InputError("--groups needs at least one log")
+        sets.append(args[i + 1 : j])
+        i = j
+    return paths, sets
 
 
 def main(argv):

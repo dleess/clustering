@@ -1,10 +1,10 @@
 # PROJECT KNOWLEDGE BASE: clustering
 
-**Generated:** 2026-10-22 · **Commit:** e0a4a7d · **Branch:** refactor/jev-state-debug
+**Generated:** 2026-10-22 · **Commit:** fb3a5c9 · **Branch:** feat/jev-wording-skill-fix
 
 ## OVERVIEW
 
-Claude/Codex plugin (`clustering`, v0.2.1) that answers "how many clusters of residues share one exchange model?" for NMR global fits produced by sherekhan (`github.com/deepnmr/sherekhan`). The skill runs fits, applies AICc/chi2 decision rules, and cross-checks the result with a jev judgment model via a state JSON built by `jev_state.py`.
+Claude/Codex plugin (`clustering`, v0.2.2) that answers "how many clusters of residues share one exchange model?" for NMR global fits produced by sherekhan (`github.com/deepnmr/sherekhan`). The skill runs fits, applies AICc/chi2 decision rules, and cross-checks the result with a jev judgment model via a state JSON built by `jev_state.py`.
 
 ## STRUCTURE
 
@@ -42,6 +42,7 @@ clustering/
 
 `skills/clustering/scripts/jev_state.py`:
 - `DELTA_KEX_SIGMA = 2.0`: influential-residue threshold (mirrors the sk_run jackknife `*` flag).
+- `VALID_REL_SE_PCT = 5.0` / `GATE_REL_SE_PCT = 5.0`: relative-SE limits for hypothesis validity and the full-fit gate.
 - `OUTPUT_INDENT = 1`: indent passed to `json.dumps` for stdout.
 - `InputError`: bad input; the CLI prints `jev_state: <msg>` and exits 2.
 - `read_block(text, name)`: extracts a named JSON block from a sherekhan fit log (also accepts a block on the last line without newline).
@@ -52,8 +53,11 @@ clustering/
 - `check_partition(full, groups)`: validates that the group fits partition the full fit's residues.
 - `hypothesis_entry(groups, n)`: builds the K-global hypothesis object (with `shared_groups` and `individuals`).
 - `hypothesis_name(h, n_groups)`: `K{n}_global` for shared clusters only, `K{shared}_plus_individuals_global` when single-residue groups are present (matches the jev structure options).
-- `build_state(paths, groups=())`: `paths[0]` is the full fit; `groups` are group fits of one K-global hypothesis.
-- `parse_argv(args)`: splits argv into `(paths, groups)`.
+- `rel_se_below(entry, limit)`: true when a group is preferred global with a non-null relative SE below `limit`.
+- `unique_name(name, taken)`: suffixes `_2`, `_3`, ... for repeated hypothesis names.
+- `derive(full, hyp_groups)`: builds the `derived` block (gate, hypothesis validity, delta AICc, selected, needs_more_fits).
+- `build_state(paths, group_sets=())`: `paths[0]` is the full fit; each set in `group_sets` is one K-global hypothesis.
+- `parse_argv(args)`: splits argv into `(paths, [group_set, ...])` on every `--groups`.
 - `main(argv) -> int`: CLI dispatch; returns the exit code.
 - `_selfcheck()`: built-in tests, run with `--selfcheck`; every log is written through `log_text(mc, jk=None)`.
 
@@ -62,6 +66,7 @@ clustering/
 - Script is stdlib-only (`json`, `math`, `os`, `sys`; `tempfile` inside `_selfcheck`). No third-party imports.
 - Tests live in `_selfcheck()`; no separate test framework or test files.
 - Output keys and rounding are a contract with the jev `_rules` and with the copy kbsi bundles byte-for-byte. Keep them stable for valid inputs.
+- `derived` is computed facts for jev; keep it the last key and never change its meaning without re-measuring jev (RT measure harness described in HANDOFF).
 - Hypothesis objects may only gain fields; never rename `K{n}_global` for pure K-group hypotheses. Hypotheses with single-residue groups are keyed `K{shared}_plus_individuals_global` because jev misread `K{len}_global` as len shared clusters.
 - Output is `json.dumps(..., indent=1)` to stdout.
 - Version bumps touch both plugin manifests in the same commit.
@@ -75,6 +80,7 @@ clustering/
 - Never hand-build the state JSON; always run `jev_state.py` on the real logs.
 - Never let an undefined number reach the output as NaN or inf; emit `null`.
 - Never commit or push from an executor agent; the orchestrator commits.
+- jev has no scratchpad: put arithmetic in `derived`, not in question text.
 
 ## COMMANDS
 
@@ -101,6 +107,7 @@ cd sherekhan/demo/multi/g2 && ../../../../venv/bin/python ../../../sk_run.py g2.
 - The jackknife block is absent when there are fewer than 2 residues or jackknife is off.
 - sherekhan never writes an `influential` key; influential residues are derived from `delta_kex` and `se` (flag if abs(delta_kex) > 2*se, se > 0).
 - The jev step is required whenever `jev_ask` is available.
+- Claude Agent calls start in the background; the orchestrator must wait for all results.
 - `codex exec` needs `< /dev/null` or it hangs waiting on stdin.
 - Installed skill copies can be stale; reinstall the plugin after a version bump.
 - Historical paths in HANDOFF.md (under `/Users/donghanlee/work/projects`, `~/.claude/skills/clustering`) do not exist as current state.

@@ -104,3 +104,14 @@ agent can pick up follow-on work (new scenarios, skill refinements).
 - BUG-E: a block on the last line without a trailing newline now parses.
 - BUG-C/D: SKILL.md makes the jev cross-check required whenever `jev_ask` is available and gives recipes for K-group, one-main-plus-individuals, and multi-hypothesis state objects. README wording matches.
 - Motivation: two fresh end-to-end runs skipped the jev gate that the plugin advertises, so the step is now stated as required.
+
+## 2026-10-22 addendum 3 - derived facts, measured jev wording, execution fixes (v0.2.2)
+
+- W0 baseline (original jev wording on the pre-0.2.2 state, 10 states x 5 reps): mean P(correct structure) 0.664; m3 0.33; m4 0.37; K4 trap 0.50; more_fits_needed 0.555.
+- Wording-only change (W1) measured worse: mean 0.652, not all argmax correct. Re-wording alone does not fix the arithmetic gap.
+- `jev_state.py` now emits a computed `derived` block (gate, hypothesis validity, delta AICc, selected hypothesis, needs_more_fits). With derived facts the measured mean P(correct structure) rises to about 0.97 (final candidate W-final: 0.976, argmax correct 10/10 on every state).
+- Agent probe finding: Claude Agent calls launch asynchronously in the background. In one probe the orchestrator ended its turn with 'I don't have either reply yet', so SKILL.md now requires waiting for every computation agent before synthesis.
+- Codex model names are corrected to the documented `gpt-6.1-sol` (orchestration) and `gpt-6-luna` (computation). The 2026-08-08 `gpt-5.6-*` names were unverified and are historical.
+- Final numbers (shipped `jev-questions.json` on states built by the shipped `jev_state.py`, 10 states x 10 reps, direct `jev_ask` calls): every structure argmax correct (80/80 answerable rows), mean P(correct structure) 0.973 (k1 1.00, m1 0.98, m2 0.95, m3 0.94, m4 0.93, g2 0.99, g3 1.00, K3-vs-K4 trap 0.99), split_further 0.877, more_fits_needed 0.969 (full-fit-only states: split 0.95, more 0.97). The old wording on the same new states scores 0.811, so both the derived facts and the re-wording contribute.
+- Fresh `claude -p --plugin-dir . --model sonnet` runs on m1, m2 and g3 each return the correct K, memberships and individuals. In every run the orchestrator ran only the full fit itself and dispatched every refit as parallel haiku Agent calls in one message, collected all results before synthesis, and called `jev_ask` once with all 4 questions. jev's structure matched the answer at confidence 0.92, 0.94 and 1.0, all with action `act`.
+- Measurement harness: a python stdio client for jev-mcp that calls `jev_ask` with the states and the rendered questions and scores P(correct class). Re-run it before any wording change.

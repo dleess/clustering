@@ -1,16 +1,16 @@
 {
-  "_usage": "jev_ask(state=<output of <skill-dir>/scripts/jev_state.py>, questions=<this file's 'questions'>). Questions are independent; put every rule in the question text, jev sees nothing else.",
-  "_rules": "Relaxation-dispersion global fitting; residues share global parameters kex and pB. Decision rules: (1) if the 1-global fit has red_chi2 = chi2/(n-k) <= 1, K=1 and any split is overfitting. (2) If red_chi2 > 1 but preferred=global with jackknife rel SE of a few percent and no influential flags, K=1 still holds; a single residue flagged better=individual with |dAICc| < 2 is noise. (3) Otherwise rank residues by chi2_glob descending; a residue is an individual only if excluding it restores the remaining fit to preferred=global with small jackknife SE. (4) Otherwise compare total AICc of 1-global vs K-global computed on the SAME total n; a K-global hypothesis counts only if every group has preferred=global and small jackknife SE. Never split a group further once its own red_chi2 <= 1, even if AICc drops slightly.",
+  "_usage": "jev_ask(state=<output of <skill-dir>/scripts/jev_state.py, unchanged, including its 'derived' facts>, questions=<this file's 'questions' with <_rules> replaced by _rules>). Questions are independent; every rule is in the question text, jev sees nothing else. jev has no scratchpad: arithmetic lives in jev_state.py's 'derived', not in this text. Re-measure with direct jev_ask runs on real states before changing any wording (see HANDOFF addendum 3).",
+  "_rules": "Context: NMR relaxation-dispersion global fitting. Each hypothesis fits residues in groups; residues in one group share the global parameters kex and pB. In the state, each fit log entry has residues_on, global.red_chi2 (reduced chi-square of that group fit), preferred (global or individual), jackknife.rel_se_pct, and per_residue rows; the hypotheses_total_n_<n> object lists every hypothesis with its total AICc on the same total n: K1_global (all residues share one cluster), individual (every residue fitted alone), K<m>_global (m shared clusters), K<s>_plus_individuals_global (s shared clusters plus the residues in 'individuals', each fitted alone). Lower AICc is better. Decision rules, applied in order: (1) if the full fit has red_chi2 <= 1, the structure is K1 and any split is overfitting. (2) if the full fit has preferred=global and jackknife rel_se_pct of a few percent, the structure is K1. (3) a hypothesis is valid only if every one of its multi-residue group fits has preferred=global and rel_se_pct below about 5; single-residue fits are individuals and need no jackknife. (4) among valid hypotheses, the one with the lowest AICc is selected; never prefer a hypothesis that splits a group whose own red_chi2 <= about 1.1. (5) the selected structure is named by its hypothesis key: K<m>_global means K<m>; K<s>_plus_individuals_global means K<s>_plus_individuals. When the state has a 'derived' object, trust it: it was computed by code from the fits and lists, per hypothesis, valid (true/false by rule 3), delta_aicc_vs_K1 (negative = better than K1_global), and the full fit's gate (red_chi2_le_1, global_preferred_small_se); 'selected' is the lowest-AICc valid hypothesis by rule 4. Use the derived facts instead of recomputing arithmetic.",
   "questions": [
     {
       "id": "evidence",
       "type": "score",
       "question": "<_rules> Rate the strength of evidence FOR the proposed split (K>1 or individuals) over a single global cluster.",
       "levels": [
-        "none: rule 1 or rule 2 resolves K=1; no split is warranted",
-        "weak: 1-global fails rules 1-2, but the proposed split lowers total AICc by less than 2 units, or at least one proposed group fails internally (preferred=individual, or jackknife rel SE above ~10%)",
-        "moderate: proposed split lowers total AICc by 2 to 10 units and every group has preferred=global with jackknife rel SE below ~5%",
-        "strong: proposed split lowers total AICc by more than 10 units, every group has preferred=global, red_chi2 roughly 0.7-1.5, jackknife rel SE below ~5%, and individual kex values separate into groups by gaps far larger than within-group spread"
+        "none: rule 1 or rule 2 resolves the structure as K1; no split is warranted",
+        "weak: the full fit fails rules 1-2, but no valid split hypothesis is present, or the best valid split lowers total AICc below K1_global by less than 2",
+        "moderate: a valid split hypothesis lowers total AICc below K1_global by 2 to 10",
+        "strong: a valid split hypothesis lowers total AICc below K1_global by more than 10"
       ]
     },
     {
@@ -19,28 +19,28 @@
       "add_none": false,
       "question": "<_rules> Which cluster structure do the rules select for this data?",
       "options": {
-        "K1": "one shared cluster, all residues",
-        "K1_plus_individuals": "one shared cluster plus one or more residues fitted individually",
-        "K2": "two shared clusters, no individuals",
-        "K2_plus_individuals": "two shared clusters plus individual residues",
-        "K3": "three shared clusters, no individuals",
-        "K3_plus_individuals": "three shared clusters plus individual residues",
-        "K4_or_more": "four or more shared clusters"
+        "K1": "all residues share one cluster (rule 1 or 2 applies, or K1_global has the lowest valid AICc)",
+        "K1_plus_individuals": "the selected hypothesis is K1_plus_individuals_global: one shared cluster plus individually fitted residues",
+        "K2": "the selected hypothesis is K2_global: two shared clusters, no individuals",
+        "K2_plus_individuals": "the selected hypothesis is K2_plus_individuals_global: two shared clusters plus individually fitted residues",
+        "K3": "the selected hypothesis is K3_global: three shared clusters, no individuals",
+        "K3_plus_individuals": "the selected hypothesis is K3_plus_individuals_global: three shared clusters plus individually fitted residues",
+        "K4_or_more": "the selected hypothesis has four or more shared clusters"
       }
     },
     {
       "id": "split_further",
       "type": "check",
-      "question": "<_rules> Would splitting any group of the selected hypothesis further (into smaller groups or individuals) be justified?",
-      "yes_means": "some group still fails internally, so it must be split further",
-      "no_means": "every group passes internally (or has red_chi2 <= 1); further splitting is overfitting"
+      "question": "<_rules> Would splitting the residues further than the selected hypothesis be justified? Yes when derived.selected is null and the full fit fails the gate (the single shared cluster is rejected), or when a multi-residue group of the selected hypothesis fails rule 3. No when the gate holds or every group of the selected hypothesis passes.",
+      "yes_means": "the current grouping is rejected and residues must be split further",
+      "no_means": "the selected grouping holds; further splitting is overfitting"
     },
     {
       "id": "more_fits_needed",
       "type": "check",
-      "question": "<_rules> Does deciding K for this data require any additional fits beyond those shown?",
-      "yes_means": "more fits are needed",
-      "no_means": "the shown fits already decide K; further fits are wasted"
+      "question": "<_rules> Are additional fits needed before K can be decided? Yes exactly when derived.needs_more_fits is true, which code sets when derived.selected is null (the full fit fails the gate and no valid split hypothesis is present).",
+      "yes_means": "derived.needs_more_fits is true: more fits are required",
+      "no_means": "derived.selected names a hypothesis: the shown fits already decide K"
     }
   ]
 }
