@@ -27,7 +27,7 @@ claude plugin install clustering@clustering
 
 The skill's final cross-check uses [jev](https://www.npmjs.com/package/jev-mcp),
 TypeSafe's judgment model, through the `jev-mcp` server. It needs a TypeSafe
-API key (`TYPESAFE_API_KEY`). Without the server the skill still runs and skips step 5; with it, step 5 always runs before K is reported.
+API key (`TYPESAFE_API_KEY`). Without the server the skill still runs and skips step 6; with it, step 6 always runs before K is reported.
 
 Claude Code:
 
@@ -67,16 +67,15 @@ procedure:
    values of the primary global parameter, per-group fits, total-AICc
    structure selection with **n = total data points in every hypothesis**.
 
-5. **jev cross-check** (required whenever the `jev` MCP server is configured) —
+6. **jev cross-check** (required whenever the `jev` MCP server is configured) —
    `scripts/jev_state.py` turns the fit logs into a compact state and
    `references/jev-questions.json` holds a fixed question set (evidence
    strength, selected structure, split-further, more-fits-needed). Undefined
    numbers are `null`; `--groups` logs must partition the full fit, otherwise
-   it exits 2 with a `jev_state:` message. jev is a gate on the orchestrator's
+   it exits 2 with a `jev_state:` message. `jev_state.py` adds a `derived` block (gate, hypothesis validity, delta AICc, selected hypothesis, needs_more_fits) so jev reads facts instead of doing arithmetic; repeat `--groups` to compare several hypotheses in one call. jev is a gate on the orchestrator's
    conclusion, never an override of the red χ² gate or a failed group refit. Single-residue group logs are reported as `individuals`, and such a hypothesis is keyed `K<shared>_plus_individuals_global`.
 
-Fit runs are dispatched as parallel computation agents (one per config);
-only the orchestrator synthesizes K.
+Fit runs are dispatched as parallel computation agents (one per config, haiku on Claude, gpt-6-luna on Codex) and the orchestrator waits for all of them before it synthesizes K.
 
 ## Validation
 
